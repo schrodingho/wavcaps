@@ -91,7 +91,8 @@ def main():
     exp_name = args.exp_name
 
     with open(args.config, "r") as f:
-        config = yaml.safe_load(f)
+        yaml_loader = yaml.YAML(typ="safe")
+        config = yaml_loader.load(f)
 
     config["audio_encoder_args"]["type"] = args.model_type
     config["audio_encoder_args"]["model"] = args.model

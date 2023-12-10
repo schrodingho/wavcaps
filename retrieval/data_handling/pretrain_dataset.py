@@ -12,7 +12,7 @@ from torch.utils.data import Dataset, DataLoader, DistributedSampler, BatchSampl
 from data_handling.sampler import BySequenceLengthSampler, BySequenceBatchSampler
 from data_handling.text_transform import text_preprocess
 import torch.nn.functional as F
-
+import os
 
 def _load_json_file(files, blacklist=None):
     json_data = []
@@ -31,7 +31,7 @@ def _load_json_file(files, blacklist=None):
                     elif ("AudioSet" in file or "AudioCaps" in file) and blacklist is not None:
                         if item["id"] in blacklist["AudioSet"]:
                             continue
-                    temp_dict = {"audio": item["audio"], "caption": item["caption"], "id": audio_id,
+                    temp_dict = {"audio": item["audio"], "caption": item["caption"], "id": audio_id, "song_id": item["id"],
                                  "duration": item["duration"]}
                     json_data.append(temp_dict)
                     audio_id += 1
@@ -54,7 +54,7 @@ class AudioLanguagePretrainDataset(Dataset):
 
         self.json_data = _load_json_file(json_files, blacklist)
         self.lengths = [item["duration"] for item in self.json_data]
-
+        self.root_dir = "/home/dingding/PycharmProjects/WavCaps/retrieval/data/waveforms/SoundBible_flac/"
         self.sr = audio_config["sr"]
         if audio_config["max_length"] != 0:
             self.max_length = audio_config["max_length"] * self.sr
@@ -67,7 +67,13 @@ class AudioLanguagePretrainDataset(Dataset):
     def __getitem__(self, index):
 
         item = self.json_data[index]
-        wav_path = item["audio"]
+        # wav_path = item["audio"]
+        # modify for the soundbible_flac
+        # if int(item["id"]) == 696:
+        #     print(item["caption"])
+
+        wav_path = self.root_dir + item["song_id"] + ".flac"
+        # print(os.getcwd())
         # duration = item["duration"]
         waveform, _ = librosa.load(wav_path, sr=self.sr, mono=True)
 
