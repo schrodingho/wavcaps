@@ -45,10 +45,12 @@ def _load_json_file(files, blacklist=None):
 class AudioLanguagePretrainDataset(Dataset):
 
     def __init__(self, json_files, audio_config, blacklist=None):
-
+        with open(json_files, "r") as f:
+            json_obj = json.load(f)        
+            self.root_dir = json_obj["dataset_path"]
         self.json_data = _load_json_file(json_files, blacklist)
         self.lengths = [item["duration"] for item in self.json_data]
-        self.root_dir = "/home/dingding/PycharmProjects/AudioSet/data/ESC-50-master/audio/"
+        # self.root_dir = "/home/dinghao/Dataset/ESC-50/audio/"
         self.sr = audio_config["sr"]
         if audio_config["max_length"] != 0:
             self.max_length = audio_config["max_length"] * self.sr

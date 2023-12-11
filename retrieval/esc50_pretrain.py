@@ -82,7 +82,7 @@ def main():
                         help="Model name.")
     parser.add_argument("-a", "--max_length", default=30, type=int,
                         help="Max length.")
-    parser.add_argument("-s", "--batch_size", default=1, type=int,
+    parser.add_argument("-s", "--batch_size", default=32, type=int,
                         help="Batch size.")
     parser.add_argument("-b", "--blacklist", default='blacklist_exclude_ub8k_esc50_vggsound.json', type=str,
                         help="Blacklist file.")
@@ -143,7 +143,7 @@ def main():
                           steps=len(dataloader) * config["training"]["epochs"])
     start_epoch = 1
     max_epoch = config["training"]["epochs"]
-    max_epoch = 5
+    # max_epoch = 5
 
     if config["resume"]:
         cp = torch.load(config.checkpoint, map_location="cpu")
@@ -182,9 +182,13 @@ def main():
     """
     prepare ESC50 validation set (zero-shot)
     """
-    df_path = "/home/dingding/PycharmProjects/AudioSet/data/ESC-50-master/meta/esc50.csv"
-    esc_root_dir = "/home/dingding/PycharmProjects/AudioSet/data/ESC-50-master/audio/"
     val_meta = dill.load(open("../data/json_files/ESC50/val_meta_label_modified.pkl", "rb"))
+    df_path = "/home/dinghao/Dataset/ESC-50/meta/esc50.csv"
+    esc_root_dir = val_meta["dataset_path"]
+    # df_path should first remove "/audio", then add "/meta/esc50.csv"
+    df_path = val_meta["dataset_path"].replace("/audio", "/meta/esc50.csv")
+    # esc_root_dir = "/home/dinghao/Dataset/ESC-50/audio/"
+    
     unseen_classes = set()
     for data in val_meta["data"]:
         unseen_classes.add(data["text"])

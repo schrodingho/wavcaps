@@ -3,12 +3,13 @@ import pandas as pd
 import numpy as np
 import shutil
 import os
+import argparse
+
+# ESC_PATH argument parser
+parser = argparse.ArgumentParser()
+parser.add_argument('--esc_path', type=str, default='/home/dinghao/Dataset/ESC-50')
 
 opt_text = ""
-
-
-
-
 
 ##################################################
 # For source domain ESC-50 dataset preprocessing #
@@ -20,7 +21,7 @@ def selected_data(selected_label, df):
     selected_df = df[df['category'].isin(selected_label)]
     return selected_df
 
-ESC_PATH = "/home/dingding/PycharmProjects/AudioSet/data/ESC-50-master"
+ESC_PATH = parser.parse_args().esc_path
 
 df = pd.read_csv(f"{ESC_PATH}/meta/esc50.csv")
 target_filename = []
