@@ -25,14 +25,8 @@ def _load_json_file(files, blacklist=None):
             json_obj = json.load(f)
             if json_obj["num_captions_per_audio"] == 1:
                 for item in json_obj["data"]:
-                    if "FreeSound" in file and blacklist is not None:
-                        if item["id"] in blacklist["FreeSound"]:
-                            continue
-                    elif ("AudioSet" in file or "AudioCaps" in file) and blacklist is not None:
-                        if item["id"] in blacklist["AudioSet"]:
-                            continue
-                    temp_dict = {"audio": item["audio"], "caption": item["caption"], "id": audio_id, "song_id": item["id"],
-                                 "duration": item["duration"]}
+                    temp_dict = {"audio": item["file"], "caption": item["opt_text"], "id": audio_id,
+                                 "duration": 5}
                     json_data.append(temp_dict)
                     audio_id += 1
             else:
@@ -54,7 +48,7 @@ class AudioLanguagePretrainDataset(Dataset):
 
         self.json_data = _load_json_file(json_files, blacklist)
         self.lengths = [item["duration"] for item in self.json_data]
-        self.root_dir = "/home/dingding/PycharmProjects/WavCaps/retrieval/data/waveforms/SoundBible_flac/"
+        self.root_dir = "/home/dingding/PycharmProjects/AudioSet/data/ESC-50-master/audio/"
         self.sr = audio_config["sr"]
         if audio_config["max_length"] != 0:
             self.max_length = audio_config["max_length"] * self.sr
@@ -72,7 +66,7 @@ class AudioLanguagePretrainDataset(Dataset):
         # if int(item["id"]) == 696:
         #     print(item["caption"])
 
-        wav_path = self.root_dir + item["song_id"] + ".flac"
+        wav_path = self.root_dir + item["audio"]
         # print(os.getcwd())
         # duration = item["duration"]
         waveform, _ = librosa.load(wav_path, sr=self.sr, mono=True)
