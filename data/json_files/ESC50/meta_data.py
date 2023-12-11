@@ -44,9 +44,14 @@ def genTrainValTest_V1(label_text_dict, all_meta_data, seen_ratio=0.7, unseen_ra
                 "label_text_dict": label_text_dict, "data": []}
 
 
+    label_2_description = json.load(open("./label_description/label_2_description.json", "r"))
+
     for train_text in train_text_pool:
         for item in all_meta_data["data_list"]:
             if item["text"] == train_text:
+                # random select one description
+                description_list = label_2_description[train_text]
+                item["opt_text"] = random.choice(description_list)
                 train_meta["data"].append(item)
                 train_meta["samples"] += 1
 
@@ -62,6 +67,8 @@ def genTrainValTest_V1(label_text_dict, all_meta_data, seen_ratio=0.7, unseen_ra
     for train_text in train_text_pool:
         for item in all_meta_data["data_list"]:
             if item["text"] == train_text:
+                description_list = label_2_description[train_text]
+                item["opt_text"] = random.choice(description_list)
                 item["label"] = train_text_label_dict[train_text]
                 train_meta_label_modified["data"].append(item)
                 train_meta_label_modified["samples"] += 1
