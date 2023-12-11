@@ -1,7 +1,5 @@
 import json
-import numpy as np
 import os
-import pandas as pd
 
 # read all json files in "./label_description"
 label_description_path = "./label_description"
