@@ -310,14 +310,12 @@ def validate(model, dataloader, device):
 def preprocess_esc50(df_path, unseen_classes):
     df = pd.read_csv(df_path)
     class_to_idx = {}
-    sorted_df = df.sort_values(by=['target'])
-    # classes = [x.replace('_', ' ') + " can be heard" for x in sorted_df['category'].unique()]
-    classes = [x for x in sorted_df['category'].unique()]
+    sorted_df = df[df['category'].isin(unseen_classes)]
+    # re index the target by the order of the unseen classes
+    sorted_df['target'] = sorted_df['category'].map(lambda x: unseen_classes.index(x))
+    classes = unseen_classes
     for i, category in enumerate(classes):
         class_to_idx[category] = i
-
-    sorted_df = sorted_df[sorted_df['category'].isin(unseen_classes)]
-    sorted_df = sorted_df.sort_values(by=['target'])
     return sorted_df, classes
 
 
@@ -333,30 +331,25 @@ def zero_shot(model, device, sorted_df, classes, esc_root_dir):
     model.eval()
     with torch.no_grad():
         text_embeds = model.encode_text(classes)
-        fold_acc = []
-        for fold in range(1, 6):
-            fold_df = sorted_df[sorted_df['fold'] == fold]
-            y_preds, y_labels = [], []
-            for file_path, target in tqdm(zip(fold_df["filename"], fold_df["target"]), total=len(fold_df)):
-                audio_path = esc_root_dir + file_path
-                one_hot_target = torch.zeros(len(classes)).scatter_(0, torch.tensor(target), 1).reshape(1, -1)
-                audio, _ = librosa.load(audio_path, sr=32000, mono=True)
-                audio = torch.tensor(audio).unsqueeze(0).to(device)
-                if audio.shape[-1] < 32000 * 10:
-                    pad_length = 32000 * 10 - audio.shape[-1]
-                    audio = F.pad(audio, [0, pad_length], "constant", 0.0)
-                audio_emb = model.encode_audio(audio)
-                similarity = audio_emb @ text_embeds.t()
-                y_pred = F.softmax(similarity.detach().cpu(), dim=1).numpy()
-                y_preds.append(y_pred)
-                y_labels.append(one_hot_target.cpu().numpy())
+        y_preds, y_labels = [], []
+        for file_path, target in tqdm(zip(sorted_df["filename"], sorted_df["target"]), total=len(sorted_df)):
+            audio_path = esc_root_dir + file_path
+            one_hot_target = torch.zeros(len(classes)).scatter_(0, torch.tensor(target), 1).reshape(1, -1)
+            audio, _ = librosa.load(audio_path, sr=32000, mono=True)
+            audio = torch.tensor(audio).unsqueeze(0).to(device)
+            if audio.shape[-1] < 32000 * 10:
+                pad_length = 32000 * 10 - audio.shape[-1]
+                audio = F.pad(audio, [0, pad_length], "constant", 0.0)
+            audio_emb = model.encode_audio(audio)
+            similarity = audio_emb @ text_embeds.t()
+            y_pred = F.softmax(similarity.detach().cpu(), dim=1).numpy()
+            y_preds.append(y_pred)
+            y_labels.append(one_hot_target.cpu().numpy())
 
-            y_labels, y_preds = np.concatenate(y_labels, axis=0), np.concatenate(y_preds, axis=0)
-            acc = accuracy_score(np.argmax(y_labels, axis=1), np.argmax(y_preds, axis=1))
-            print('Fold {} Accuracy {}'.format(fold, acc))
-            fold_acc.append(acc)
+        y_labels, y_preds = np.concatenate(y_labels, axis=0), np.concatenate(y_preds, axis=0)
+        acc = accuracy_score(np.argmax(y_labels, axis=1), np.argmax(y_preds, axis=1))
+        print('ESC50 Accuracy {}'.format(acc))
 
-    print('ESC50 Accuracy {}'.format(np.mean(np.array(fold_acc))))
 
 
 if __name__ == '__main__':
