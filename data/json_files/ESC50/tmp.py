@@ -5,13 +5,12 @@ import os
 def preprocess_esc50(df_path, unseen_classes):
     df = pd.read_csv(df_path)
     class_to_idx = {}
-    sorted_df = df.sort_values(by=['target'])
-    classes = [x.replace('_', ' ') + " can be heard" for x in sorted_df['category'].unique()]
+    sorted_df = df[df['category'].isin(unseen_classes)]
+    # re index the target by the order of the unseen classes
+    sorted_df['target'] = sorted_df['category'].map(lambda x: unseen_classes.index(x))
+    classes = unseen_classes
     for i, category in enumerate(classes):
         class_to_idx[category] = i
-
-    sorted_df = sorted_df[sorted_df['category'].isin(unseen_classes)]
-    sorted_df = sorted_df.sort_values(by=['target'])
     return sorted_df, classes
 
 
@@ -40,11 +39,12 @@ for data in val_meta["data"]:
 
 print("train label set: ", train_classes)
 print("val label set: ", val_classes)
-val_classes = list(val_classes)
+val_classes = sorted(list(val_classes))
 
 # print(train_meta)
 
 
 df_path = "/home/dingding/PycharmProjects/AudioSet/data/ESC-50-master/meta/esc50.csv"
 sorted_df, classes = preprocess_esc50(df_path, val_classes)
-print(len(classes))
+print(classes)
+print(sorted_df)
