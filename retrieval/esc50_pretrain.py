@@ -183,19 +183,16 @@ def main():
     prepare ESC50 validation set (zero-shot)
     """
     val_meta = dill.load(open("../data/json_files/ESC50/val_meta_label_modified.pkl", "rb"))
-    df_path = "/home/dinghao/Dataset/ESC-50/meta/esc50.csv"
     esc_root_dir = val_meta["dataset_path"]
     # df_path should first remove "/audio", then add "/meta/esc50.csv"
-    df_path = val_meta["dataset_path"].replace("/audio", "/meta/esc50.csv")
+    df_path = val_meta["dataset_path"].replace("/audio/", "/meta/esc50.csv")
     # esc_root_dir = "/home/dinghao/Dataset/ESC-50/audio/"
     
     unseen_classes = set()
     for data in val_meta["data"]:
         unseen_classes.add(data["text"])
     unseen_classes = list(unseen_classes)
-
     val_sorted_df, val_classes = preprocess_esc50(df_path, unseen_classes)
-
 
 
     loss_stats = []
@@ -320,7 +317,7 @@ def preprocess_esc50(df_path, unseen_classes):
         class_to_idx[category] = i
 
     sorted_df = sorted_df[sorted_df['category'].isin(unseen_classes)]
-    sorted_df = df.sort_values(by=['target'])
+    sorted_df = sorted_df.sort_values(by=['target'])
     return sorted_df, classes
 
 

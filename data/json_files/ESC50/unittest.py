@@ -33,4 +33,3 @@ print("val label set: ", val_classes)
 
 
 # print(train_meta)
-{'pig', 'thunderstorm', 'coughing', 'brushing_teeth', 'crying_baby', 'vacuum_cleaner', 'hen', 'insects', 'dog', 'clock_alarm', 'frog', 'breathing', 'mouse_click', 'cow', 'drinking_sipping', 'water_drops', 'sheep', 'rooster', 'crow', 'cat', 'chirping_birds', 'sneezing', 'door_wood_knock', 'can_opening', 'crackling_fire', 'glass_breaking', 'clock_tick', 'washing_machine', 'laughing', 'crickets', 'clapping', 'pouring_water', 'sea_waves', 'door_wood_creaks', 'rain', 'toilet_flush', 'wind', 'snoring', 'keyboard_typing', 'footsteps'}

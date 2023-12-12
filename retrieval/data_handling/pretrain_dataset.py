@@ -45,7 +45,7 @@ def _load_json_file(files, blacklist=None):
 class AudioLanguagePretrainDataset(Dataset):
 
     def __init__(self, json_files, audio_config, blacklist=None):
-        with open(json_files, "r") as f:
+        with open(json_files[0], "r") as f:
             json_obj = json.load(f)        
             self.root_dir = json_obj["dataset_path"]
         self.json_data = _load_json_file(json_files, blacklist)
