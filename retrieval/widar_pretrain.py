@@ -40,7 +40,6 @@ def train(model, dataloader, optimizer, scheduler, device, epoch):
         dataloader.sampler.set_epoch(epoch)
 
     for batch_id, (audio, text, idx) in tqdm(enumerate(dataloader), total=len(dataloader)):
-
         optimizer.zero_grad()
 
         step = len(dataloader) * (epoch - 1) + batch_id
@@ -70,9 +69,9 @@ def train(model, dataloader, optimizer, scheduler, device, epoch):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("-c", "--config", default="settings/pretrain_esc50.yaml", type=str,
+    parser.add_argument("-c", "--config", default="settings/pretrain_widar.yaml", type=str,
                         help="Setting files")
-    parser.add_argument("-n", "--exp_name", default="exp_name", type=str,
+    parser.add_argument("-n", "--exp_name", default="Widar_Exp", type=str,
                         help="name of this experiment.")
     parser.add_argument("-l", "--lr", default=5e-5, type=float,
                         help="Learning rate.")
@@ -187,13 +186,12 @@ def main():
     # df_path should first remove "/audio", then add "/meta/esc50.csv"
     df_path = val_meta["dataset_path"].replace("/audio/", "/meta/esc50.csv")
     # esc_root_dir = "/home/dinghao/Dataset/ESC-50/audio/"
-    
+
     unseen_classes = set()
     for data in val_meta["data"]:
         unseen_classes.add(data["text"])
     unseen_classes = list(unseen_classes)
     val_sorted_df, val_classes = preprocess_esc50(df_path, unseen_classes)
-
 
     loss_stats = []
     ac_recall_stats = []
@@ -272,6 +270,7 @@ import numpy as np
 import torch.nn.functional as F
 from sklearn.metrics import accuracy_score
 
+
 @torch.no_grad()
 def zero_shot(model, device, sorted_df, classes, esc_root_dir):
     model.eval()
@@ -295,7 +294,6 @@ def zero_shot(model, device, sorted_df, classes, esc_root_dir):
         y_labels, y_preds = np.concatenate(y_labels, axis=0), np.concatenate(y_preds, axis=0)
         acc = accuracy_score(np.argmax(y_labels, axis=1), np.argmax(y_preds, axis=1))
         print('ESC50 Accuracy {}'.format(acc))
-
 
 
 if __name__ == '__main__':

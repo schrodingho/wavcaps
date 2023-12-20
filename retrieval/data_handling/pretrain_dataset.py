@@ -13,6 +13,8 @@ from data_handling.sampler import BySequenceLengthSampler, BySequenceBatchSample
 from data_handling.text_transform import text_preprocess
 import torch.nn.functional as F
 import os
+import dill
+import numpy as np
 
 def _load_json_file(files, blacklist=None):
     json_data = []
@@ -63,14 +65,8 @@ class AudioLanguagePretrainDataset(Dataset):
     def __getitem__(self, index):
 
         item = self.json_data[index]
-        # wav_path = item["audio"]
-        # modify for the soundbible_flac
-        # if int(item["id"]) == 696:
-        #     print(item["caption"])
-
         wav_path = self.root_dir + item["audio"]
-        # print(os.getcwd())
-        # duration = item["duration"]
+
         waveform, _ = librosa.load(wav_path, sr=self.sr, mono=True)
 
         if self.max_length != 0:
@@ -85,6 +81,58 @@ class AudioLanguagePretrainDataset(Dataset):
 
         return torch.tensor(waveform), caption, audio_id
         # return duration, caption, audio_id
+
+class WidarDataset(Dataset):
+
+    def __init__(self, widar_files):
+
+        widar_data = dill.load(open(widar_files, "rb"))
+        self.root_dir = widar_data["dataset_path"]
+        self.json_data = widar_data["data"]
+        audio_id = 0
+        for item in self.json_data:
+            item["id"] = audio_id
+            audio_id += 1
+
+        assert len(self.json_data) == widar_data["samples"]
+
+    def __len__(self):
+        return len(self.json_data)
+
+    def __getitem__(self, index):
+        item = self.json_data[index]
+        file_path = self.root_dir + item["text"]
+
+        x = np.genfromtxt(file_path, delimiter=',')
+        x = (x - 0.0025) / 0.0119
+        x = x.reshape(22, 20, 20)
+        x = torch.FloatTensor(x)
+
+        caption = item["opt_text"]
+        audio_id = item["id"]
+
+        return x, caption, audio_id
+        # return duration, caption, audio_id
+
+def pretrain_widar_dataloader(config,
+                              bucket: bool = True,
+                              bucket_boundaries: tuple = (5, 30, 6),
+                              is_distributed: bool = False,
+                              num_tasks: int = 0,
+                              global_rank: int = 0
+                              ):
+    dataset = AudioLanguagePretrainDataset(config["json_files"], config["audio_args"], config["blacklist"])
+    sampler = None
+    return DataLoader(
+        dataset,
+        batch_size=config["data_args"]["batch_size"],
+        num_workers=config["data_args"]["num_workers"],
+        pin_memory=False,
+        sampler=sampler,
+        shuffle=True,
+        drop_last=True
+    )
+
 
 
 def collate_fn(batch):
