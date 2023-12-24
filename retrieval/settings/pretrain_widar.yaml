@@ -37,7 +37,7 @@ data_args:
 #prajjwal1/bert-tiny
 
 text_encoder_args:
-  type: 'bert-base-uncased'
+  type: 'prajjwal1/bert-tiny'
   freeze: False
 
 

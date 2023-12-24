@@ -14,8 +14,8 @@ import ruamel.yaml as yaml
 from tqdm import tqdm
 from loguru import logger
 from data_handling.datamodule import AudioCaptionDataModule
-from data_handling.pretrain_dataset import pretrain_dataloader
-from models.ase_model import ASE
+from data_handling.pretrain_dataset import pretrain_dataloader, pretrain_widar_dataloader
+from models.ase_model import ASE, ASE_widar
 import torch.distributed as dist
 import pandas as pd
 from tools.optim_utils import get_optimizer, cosine_lr
@@ -39,7 +39,7 @@ def train(model, dataloader, optimizer, scheduler, device, epoch):
     if is_dist_avail_and_initialized():
         dataloader.sampler.set_epoch(epoch)
 
-    for batch_id, (audio, text, idx) in tqdm(enumerate(dataloader), total=len(dataloader)):
+    for batch_id, (audio, text, idx, y_true) in tqdm(enumerate(dataloader), total=len(dataloader)):
         optimizer.zero_grad()
 
         step = len(dataloader) * (epoch - 1) + batch_id
@@ -81,7 +81,7 @@ def main():
                         help="Model name.")
     parser.add_argument("-a", "--max_length", default=30, type=int,
                         help="Max length.")
-    parser.add_argument("-s", "--batch_size", default=32, type=int,
+    parser.add_argument("-s", "--batch_size", default=64, type=int,
                         help="Batch size.")
     parser.add_argument("-b", "--blacklist", default='blacklist_exclude_ub8k_esc50_vggsound.json', type=str,
                         help="Blacklist file.")
@@ -117,15 +117,28 @@ def main():
     )
 
     # create pretrain dataloader
-    dataloader = pretrain_dataloader(config,
-                                     bucket=False,
-                                     bucket_boundaries=(5, 30, 6),
-                                     is_distributed=is_dist_avail_and_initialized(),
-                                     num_tasks=get_world_size(),
-                                     global_rank=get_rank())
+    # dataloader = pretrain_dataloader(config,
+    #                                  bucket=False,
+    #                                  bucket_boundaries=(5, 30, 6),
+    #                                  is_distributed=is_dist_avail_and_initialized(),
+    #                                  num_tasks=get_world_size(),
+    #                                  global_rank=get_rank())
+
+    dataloader = pretrain_widar_dataloader(config, widar_file_path="../data/json_files/Widar/train_meta.pkl")
+
+    """
+    prepare Widar validation set (zero-shot) seen and unseen classes
+    """
+    val_seen_loader = pretrain_widar_dataloader(config, widar_file_path="../data/json_files/Widar/val_seen_meta.pkl", val_data=True)
+    val_unseen_loader = pretrain_widar_dataloader(config, widar_file_path="../data/json_files/Widar/val_unseen_meta.pkl", val_data=True)
+    val_seen_text_label_dict = dill.load(open("../data/json_files/Widar/val_seen_meta.pkl", 'rb'))["label_text_dict"]
+    val_unseen_text_label_dict = dill.load(open("../data/json_files/Widar/val_unseen_meta.pkl", 'rb'))["label_text_dict"]
+    val_seen_classes = list(val_seen_text_label_dict.keys())
+    val_unseen_classes = list(val_unseen_text_label_dict.keys())
+    val_unseen_classes.extend(val_seen_classes)
 
     # setup model
-    model = ASE(config)
+    model = ASE_widar(config)
     model = model.to(device)
     wandb.watch(model)
 
@@ -172,30 +185,8 @@ def main():
         )
         model_without_ddp = model.module
 
-    # load evaluation datamodule
-    # ac_datamodule = AudioCaptionDataModule(config, "AudioCaps")
-    # clotho_datamodule = AudioCaptionDataModule(config, "Clotho")
-    # ac_val_loader = ac_datamodule.val_dataloader()
-    # clotho_val_loader = clotho_datamodule.val_dataloader()
-
-    """
-    prepare ESC50 validation set (zero-shot)
-    """
-    val_meta = dill.load(open("../data/json_files/ESC50/val_meta_label_modified.pkl", "rb"))
-    esc_root_dir = val_meta["dataset_path"]
-    # df_path should first remove "/audio", then add "/meta/esc50.csv"
-    df_path = val_meta["dataset_path"].replace("/audio/", "/meta/esc50.csv")
-    # esc_root_dir = "/home/dinghao/Dataset/ESC-50/audio/"
-
-    unseen_classes = set()
-    for data in val_meta["data"]:
-        unseen_classes.add(data["text"])
-    unseen_classes = list(unseen_classes)
-    val_sorted_df, val_classes = preprocess_esc50(df_path, unseen_classes)
 
     loss_stats = []
-    ac_recall_stats = []
-    clotho_recall_stats = []
     for epoch in range(start_epoch, max_epoch + 1):
         main_logger.info(f'Training for epoch [{epoch}]')
 
@@ -220,8 +211,11 @@ def main():
         if is_dist_avail_and_initialized():
             dist.barrier()
             torch.cuda.empty_cache()
-        # # validate on ESC50 unseen classes
-        zero_shot(model, device, val_sorted_df, val_classes, esc_root_dir)
+        # # validate on Widar seen classes
+        zero_shot(model, val_seen_loader, device, val_seen_classes, epoch=epoch, type="seen")
+        # # validate on Widar unseen classes
+        zero_shot(model, val_unseen_loader, device, val_unseen_classes, epoch=epoch, type="unseen")
+
 
     main_logger.info("Done.")
     wandb.finish()
@@ -272,28 +266,24 @@ from sklearn.metrics import accuracy_score
 
 
 @torch.no_grad()
-def zero_shot(model, device, sorted_df, classes, esc_root_dir):
+def zero_shot(model, dataloader, device, class_text_list, epoch=None, type="seen"):
     model.eval()
-    with torch.no_grad():
-        text_embeds = model.encode_text(classes)
-        y_preds, y_labels = [], []
-        for file_path, target in tqdm(zip(sorted_df["filename"], sorted_df["target"]), total=len(sorted_df)):
-            audio_path = esc_root_dir + file_path
-            one_hot_target = torch.zeros(len(classes)).scatter_(0, torch.tensor(target), 1).reshape(1, -1)
-            audio, _ = librosa.load(audio_path, sr=32000, mono=True)
-            audio = torch.tensor(audio).unsqueeze(0).to(device)
-            if audio.shape[-1] < 32000 * 10:
-                pad_length = 32000 * 10 - audio.shape[-1]
-                audio = F.pad(audio, [0, pad_length], "constant", 0.0)
-            audio_emb = model.encode_audio(audio)
-            similarity = audio_emb @ text_embeds.t()
-            y_pred = F.softmax(similarity.detach().cpu(), dim=1).numpy()
-            y_preds.append(y_pred)
-            y_labels.append(one_hot_target.cpu().numpy())
-
-        y_labels, y_preds = np.concatenate(y_labels, axis=0), np.concatenate(y_preds, axis=0)
-        acc = accuracy_score(np.argmax(y_labels, axis=1), np.argmax(y_preds, axis=1))
-        print('ESC50 Accuracy {}'.format(acc))
+    text_embeds = model.encode_text(class_text_list)
+    targets = torch.zeros(0).to(device)
+    similarity = torch.zeros(0).to(device)
+    for batch_idx, (wifi, _, idx, y_true) in tqdm(enumerate(dataloader), total=len(dataloader)):
+        wifi = wifi.to(device)
+        wifi_embeds = model.encode_wifi(wifi)
+        logits = wifi_embeds @ text_embeds.t()
+        sim_batch = F.log_softmax(logits, dim=1)
+        targets = torch.cat((targets, y_true.to(device)), dim=0)
+        similarity = torch.cat((similarity, sim_batch), dim=0)
+    values, indices = similarity.topk(5)
+    top1 = indices[:, 0] == targets
+    top1_acc = top1.sum() / len(top1)
+    if not epoch:
+        epoch = -1
+    print(f'Type: {type}, epoch {epoch}, val/top1 {top1_acc}')
 
 
 if __name__ == '__main__':

@@ -84,11 +84,11 @@ class AudioLanguagePretrainDataset(Dataset):
 
 class WidarDataset(Dataset):
 
-    def __init__(self, widar_files):
+    def __init__(self, widar_file_path):
 
-        widar_data = dill.load(open(widar_files, "rb"))
+        widar_data = dill.load(open(widar_file_path, "rb"))
         self.root_dir = widar_data["dataset_path"]
-        self.json_data = widar_data["data"]
+        self.json_data = widar_data["data_list"]
         audio_id = 0
         for item in self.json_data:
             item["id"] = audio_id
@@ -101,17 +101,18 @@ class WidarDataset(Dataset):
 
     def __getitem__(self, index):
         item = self.json_data[index]
-        file_path = self.root_dir + item["text"]
+        file_path = self.root_dir + "/" + item["path"] + "/" + item["text"] + "/" + item["file"]
 
         x = np.genfromtxt(file_path, delimiter=',')
         x = (x - 0.0025) / 0.0119
         x = x.reshape(22, 20, 20)
         x = torch.FloatTensor(x)
+        y = item["label"]
 
         caption = item["opt_text"]
         audio_id = item["id"]
 
-        return x, caption, audio_id
+        return x, caption, audio_id, y
         # return duration, caption, audio_id
 
 def pretrain_widar_dataloader(config,
@@ -119,19 +120,34 @@ def pretrain_widar_dataloader(config,
                               bucket_boundaries: tuple = (5, 30, 6),
                               is_distributed: bool = False,
                               num_tasks: int = 0,
-                              global_rank: int = 0
+                              global_rank: int = 0,
+                              widar_file_path: str = None,
+                              val_data: bool = False
                               ):
-    dataset = AudioLanguagePretrainDataset(config["json_files"], config["audio_args"], config["blacklist"])
+    # TODO: change here to WidarDataset
+    # dataset = AudioLanguagePretrainDataset(config["json_files"], config["audio_args"], config["blacklist"])
+    dataset = WidarDataset(widar_file_path)
     sampler = None
-    return DataLoader(
-        dataset,
-        batch_size=config["data_args"]["batch_size"],
-        num_workers=config["data_args"]["num_workers"],
-        pin_memory=False,
-        sampler=sampler,
-        shuffle=True,
-        drop_last=True
-    )
+    if not val_data:
+        return DataLoader(
+            dataset,
+            batch_size=config["data_args"]["batch_size"],
+            num_workers=config["data_args"]["num_workers"],
+            pin_memory=False,
+            sampler=sampler,
+            shuffle=True,
+            drop_last=True
+        )
+    else:
+        return DataLoader(
+            dataset,
+            batch_size=config["data_args"]["batch_size"],
+            num_workers=config["data_args"]["num_workers"],
+            pin_memory=False,
+            sampler=sampler,
+            shuffle=False,
+            drop_last=False
+        )
 
 
 

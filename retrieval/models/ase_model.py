@@ -19,16 +19,16 @@ class ASE_widar(nn.Module):
     def __init__(self, config):
         super().__init__()
 
-        self.audio_encoder = AudioEncoder(config)
+        # self.audio_encoder = AudioEncoder(config)
         self.text_encoder = TextEncoder(config)
 
         # settings for projection layers
         embed_size = config["embed_size"]
-        audio_width = self.audio_encoder.audio_width
+        # audio_width = self.audio_encoder.audio_width
         text_width = self.text_encoder.text_width
 
         widar_hidden_dim = 1024
-        self.widar_encoder = Widar_CNN5(hidden_dim=widar_hidden_dim, output_dim=embed_size)
+        self.wifi_encoder = Widar_CNN5(hidden_dim=widar_hidden_dim, output_dim=embed_size)
 
         # self.audio_proj = nn.Sequential(
         #     nn.Linear(audio_width, embed_size),
@@ -36,7 +36,7 @@ class ASE_widar(nn.Module):
         #     nn.Linear(embed_size, embed_size),
         # )
 
-        self.widar_proj = nn.Sequential(
+        self.wifi_proj = nn.Sequential(
             nn.Linear(widar_hidden_dim, embed_size),
             nn.ReLU(),
             nn.Linear(embed_size, embed_size),
@@ -59,7 +59,7 @@ class ASE_widar(nn.Module):
     #     audio_embeds = F.normalize(self.audio_proj(audio_feats), dim=-1)
     #     return audio_embeds
 
-    def encoder_wifi(self, wifi):
+    def encode_wifi(self, wifi):
         wifi_feats = self.wifi_encoder(wifi)
         wifi_embeds = F.normalize(self.wifi_proj(wifi_feats), dim=-1)
         return wifi_embeds
