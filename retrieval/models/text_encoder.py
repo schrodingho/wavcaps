@@ -4,6 +4,7 @@
 # @E-mail  : x.mei@surrey.ac.uk
 
 
+
 import torch.nn as nn
 from transformers import (
     BertModel,
@@ -14,12 +15,12 @@ from transformers import (
     RobertaTokenizer,
     DistilBertModel,
     DistilBertTokenizer,
-    CLIPTokenizer,
-    CLIPTextModel,
+    # CLIPTokenizer,
+    # CLIPTextModel,
 )
 
 MODELS = {
-    'openai/clip-vit-base-patch32': (CLIPTextModel, CLIPTokenizer, 512),
+    # 'openai/clip-vit-base-patch32': (CLIPTextModel, CLIPTokenizer, 512),
     'prajjwal1/bert-tiny': (BertModel, BertTokenizer, 128),
     'prajjwal1/bert-mini': (BertModel, BertTokenizer, 256),
     'prajjwal1/bert-small': (BertModel, BertTokenizer, 512),
@@ -43,8 +44,9 @@ class TextEncoder(nn.Module):
         self.tokenizer = MODELS[config["text_encoder_args"]["type"]][1].from_pretrained(
             config["text_encoder_args"]["type"])
         self.text_encoder = MODELS[config["text_encoder_args"]["type"]][0].from_pretrained(
-            config["text_encoder_args"]["type"],
-            add_pooling_layer=False)
+            config["text_encoder_args"]["type"]
+            # add_pooling_layer=False
+        )
 
         if config["text_encoder_args"]["freeze"]:
             for name, param in self.text_encoder.named_parameters():

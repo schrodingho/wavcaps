@@ -28,11 +28,11 @@ from tools.utils import (
     setup_seed,
     AverageMeter, t2a, a2t, set_logger, log_results,
 )
-
+import clip
 
 def train(model, dataloader, optimizer, scheduler, device, epoch):
     model.train()
-
+    model.clip_model.train()
     epoch_loss = AverageMeter()
     start_time = time.time()
 
@@ -268,7 +268,10 @@ from sklearn.metrics import accuracy_score
 @torch.no_grad()
 def zero_shot(model, dataloader, device, class_text_list, epoch=None, type="seen"):
     model.eval()
-    text_embeds = model.encode_text(class_text_list)
+    text_tokenized = clip.tokenize(class_text_list).to(device)
+    model.clip_model.eval()
+    text_embeds = model.clip_model.encode_text(text_tokenized).float()
+    # text_embeds = model.encode_text(class_text_list)
     targets = torch.zeros(0).to(device)
     similarity = torch.zeros(0).to(device)
     for batch_idx, (wifi, _, idx, y_true) in tqdm(enumerate(dataloader), total=len(dataloader)):

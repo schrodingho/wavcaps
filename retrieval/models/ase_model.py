@@ -3,7 +3,7 @@
 # @Author  : Xinhao Mei @CVSSP, University of Surrey
 # @E-mail  : x.mei@surrey.ac.uk
 
-
+import clip
 import torch
 import torch.nn as nn
 from models.audio_encoder import AudioEncoder
@@ -20,21 +20,21 @@ class ASE_widar(nn.Module):
         super().__init__()
 
         # self.audio_encoder = AudioEncoder(config)
-        self.text_encoder = TextEncoder(config)
+        # self.text_encoder = TextEncoder(config)
+
+        self.clip_model, clip_state_dict = clip.load("ViT-B/16",device="cuda", jit=False)
+        self.clip_model = self.clip_model.float()
+        text_width = 512
 
         # settings for projection layers
         embed_size = config["embed_size"]
         # audio_width = self.audio_encoder.audio_width
-        text_width = self.text_encoder.text_width
+        # text_width = self.text_encoder.text_width
 
         widar_hidden_dim = 1024
         self.wifi_encoder = Widar_CNN5(hidden_dim=widar_hidden_dim, output_dim=embed_size)
 
-        # self.audio_proj = nn.Sequential(
-        #     nn.Linear(audio_width, embed_size),
-        #     nn.ReLU(),
-        #     nn.Linear(embed_size, embed_size),
-        # )
+
 
         self.wifi_proj = nn.Sequential(
             nn.Linear(widar_hidden_dim, embed_size),
@@ -65,8 +65,12 @@ class ASE_widar(nn.Module):
         return wifi_embeds
 
     def encode_text(self, text):
-        text_feats = self.text_encoder(text)
-        text_embeds = F.normalize(self.text_proj(text_feats[:, 0, :]), dim=-1)
+        text_tokenized = clip.tokenize(text).to("cuda")
+        text_feats = self.clip_model.encode_text(text_tokenized)
+        text_embeds = F.normalize(text_feats, dim=-1)
+        # text_embeds = F.normalize(self.text_proj(text_feats), dim=-1)
+        # text_feats = self.text_encoder(text)
+        # text_embeds = F.normalize(self.text_proj(text_feats[:, 0, :]), dim=-1)
         return text_embeds
 
     def forward(self, wifi, text, idx):

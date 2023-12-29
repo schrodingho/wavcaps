@@ -1,6 +1,6 @@
 device: "cuda"
 seed: 20
-embed_size: 1024
+embed_size: 512
 temp: 0.07
 queue_size: 5120
 json_files: ['../data/json_files/Widar/train_meta.pkl']
@@ -35,7 +35,7 @@ data_args:
 
 #bert-base-uncased
 #prajjwal1/bert-tiny
-
+#openai/clip-vit-base-patch32
 text_encoder_args:
   type: 'prajjwal1/bert-tiny'
   freeze: False
